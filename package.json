@@ -8,7 +8,8 @@
     "preview": "vite preview",
     "lint": "eslint src --fix --ext .js,.jsx,.ts,.tsx",
     "prettier": "prettier --write .",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "fetch": "ts-node --project scripts/tsconfig.json scripts/index.ts"
   },
   "dependencies": {
     "react": "^18.0.0",
@@ -35,6 +36,7 @@
     "husky": "^8.0.1",
     "lint-staged": "^13.0.3",
     "prettier": "^2.7.1",
+    "ts-node": "^10.8.2",
     "typescript": "^4.6.3",
     "vite": "^2.9.9",
     "vite-plugin-eslint": "^1.6.1"
