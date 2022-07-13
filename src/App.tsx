@@ -1,47 +1,56 @@
-import { useState } from 'react';
-import logo from './logo.svg';
-import './App.css';
+import styled from 'styled-components';
+import * as icons from './icons';
+
+const Title = styled.h2`
+  text-align: center;
+`;
+
+const Cards = styled.main`
+  margin: 32px 0px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+`;
+
+const Card = styled.div`
+  width: 200px;
+  padding: 32px 24px;
+  border: 1px solid;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  svg {
+    width: 36px;
+  }
+  span {
+    margin-top: 16px;
+  }
+  &:hover {
+    svg {
+      transform: scale(1.2);
+      transition: transform 0.2s ease-in-out;
+    }
+  }
+`;
 
 function App() {
-  const [count, setCount] = useState(0);
-
   return (
-    <div className='App'>
-      <header className='App-header'>
-        <img src={logo} className='App-logo' alt='logo' />
-        <p>Hello Vite + React!</p>
-        <p>
-          <button
-            type='button'
-            onClick={() => setCount((number) => number + 1)}
-          >
-            count is: {count}
-          </button>
-        </p>
-        <p>
-          Edit <code>App.tsx</code> and save to test HMR updates.
-        </p>
-        <p>
-          <a
-            className='App-link'
-            href='https://reactjs.org'
-            target='_blank'
-            rel='noopener noreferrer'
-          >
-            Learn React
-          </a>
-          {' | '}
-          <a
-            className='App-link'
-            href='https://vitejs.dev/guide/features.html'
-            target='_blank'
-            rel='noopener noreferrer'
-          >
-            Vite Docs
-          </a>
-        </p>
-      </header>
-    </div>
+    <>
+      <Title>Shared Icons</Title>
+      <Cards>
+        {Object.entries(icons).map(([name, Icon]) => (
+          <Card key={name}>
+            <Icon />
+            <span>{name}</span>
+          </Card>
+        ))}
+      </Cards>
+    </>
   );
 }
 
