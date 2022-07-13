@@ -9,7 +9,8 @@
     "lint": "eslint src --fix --ext .js,.jsx,.ts,.tsx",
     "prettier": "prettier --write .",
     "prepare": "husky install",
-    "fetch": "ts-node --project scripts/tsconfig.json scripts/index.ts"
+    "fetch": "ts-node --project scripts/tsconfig.json scripts/index.ts",
+    "generateIcons": "svgr src/svg"
   },
   "dependencies": {
     "axios": "^0.27.2",
@@ -22,6 +23,7 @@
   "devDependencies": {
     "@commitlint/cli": "^17.0.3",
     "@commitlint/config-conventional": "^17.0.3",
+    "@svgr/cli": "^6.2.1",
     "@types/eslint": "^8.4.5",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",

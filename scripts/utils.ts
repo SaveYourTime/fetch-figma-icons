@@ -52,6 +52,21 @@ export const getSVGsFromComponents = async (
   );
 };
 
+const sanitizeSVGs = (
+  components: { id: string; name: string; svg: string }[],
+) =>
+  components.filter((component, index, items) => {
+    if (!component.svg) {
+      console.log('SVG not fould:', component.name);
+      return false;
+    }
+    if (items.findIndex((item) => item.name === component.name) !== index) {
+      console.log('Duplicate found:', component.name);
+      return false;
+    }
+    return true;
+  });
+
 const optimizeSVG = async (svg: string, path: string) => {
   const config = await loadConfig();
   const result = optimize(svg, { ...config, path });
@@ -72,14 +87,10 @@ export const generateSVGs = async (
   // create svg folder if not exists
   await mkdir(SVG_PATH, { recursive: true });
   await Promise.all(
-    svgs.map(async ({ name, svg }) => {
-      if (svg) {
-        const path = resolve(SVG_PATH, `${name}.svg`);
-        const optimizedSVG = await optimizeSVG(svg, path);
-        await writeFile(path, optimizedSVG, { encoding: 'utf8' });
-      } else {
-        console.log(`${name} not found`);
-      }
+    sanitizeSVGs(svgs).map(async ({ name, svg }) => {
+      const path = resolve(SVG_PATH, `${name}.svg`);
+      const optimizedSVG = await optimizeSVG(svg, path);
+      await writeFile(path, optimizedSVG, { encoding: 'utf8' });
     }),
   );
 };
