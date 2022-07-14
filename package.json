@@ -9,12 +9,14 @@
     "lint": "eslint src --fix --ext .js,.jsx,.ts,.tsx",
     "prettier": "prettier --write .",
     "prepare": "husky install",
-    "fetch": "ts-node --project scripts/tsconfig.json scripts/index.ts",
-    "generateIcons": "svgr src/svg"
+    "fetchIcons": "ts-node --project scripts/tsconfig.json scripts/index.ts",
+    "generateIcons": "svgr src/svg && yarn lint"
   },
   "dependencies": {
     "axios": "^0.27.2",
     "dotenv": "^16.0.1",
+    "jsdom": "^20.0.0",
+    "lodash": "^4.17.21",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "rimraf": "^3.0.2",
@@ -26,6 +28,8 @@
     "@commitlint/config-conventional": "^17.0.3",
     "@svgr/cli": "^6.2.1",
     "@types/eslint": "^8.4.5",
+    "@types/jsdom": "^16.2.14",
+    "@types/lodash": "^4.14.182",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
     "@types/rimraf": "^3.0.2",

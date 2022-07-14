@@ -28,6 +28,12 @@ module.exports = {
     'import/prefer-default-export': 'off',
     'react/react-in-jsx-scope': 'off',
     'react/function-component-definition': ['off'],
-    'react/jsx-props-no-spreading': [2, { exceptions: ['svg'] }],
+    'react/jsx-props-no-spreading': [
+      2,
+      { exceptions: ['svg', 'WrappedComponent'] },
+    ],
+    'react/prop-types': 'off',
+    'react/require-default-props': 'off',
+    'react/destructuring-assignment': 'off',
   },
 };

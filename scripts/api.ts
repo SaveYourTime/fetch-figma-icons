@@ -6,13 +6,11 @@ const API_URL = 'https://api.figma.com';
 const API_VERSION = 'v1';
 const BASE_URL = `${API_URL}/${API_VERSION}`;
 
-const FIGMA_TOKEN = process.env.FIGMA_TOKEN ?? '';
-/**
- * https://www.figma.com/file/:key/:title?node-id=:id
- * see more: https://www.figma.com/developers/api#files-endpoints
- */
-const FIGMA_FILE_KEY = 'vFxyFWm7CyhdQuCIAfBxpB';
-const FIGMA_NODE_ID = '3:16147';
+const {
+  FIGMA_TOKEN = '',
+  FIGMA_FILE_KEY = '',
+  FIGMA_NODE_ID = '',
+} = process.env;
 
 const api = axios.create({
   baseURL: BASE_URL,
