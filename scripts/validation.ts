@@ -177,7 +177,9 @@ export async function exportErrors(errors: MetaError<any>[]) {
     .map(({ errorCode, raw: { id, name } }) => ({
       name,
       error: translateErrorCode(errorCode),
-      url: `https://www.figma.com/file/${process.env.FIGMA_FILE_KEY}?node-id=${id}`,
+      url: id
+        ? `https://www.figma.com/file/${process.env.FIGMA_FILE_KEY}?node-id=${id}`
+        : '',
     }));
   console.table(formatted);
   await fs.writeFile(
@@ -185,7 +187,7 @@ export async function exportErrors(errors: MetaError<any>[]) {
     [
       'name,error,url',
       formatted
-        .map(({ name, error, url }) => `"${name}", "${error}", "${url}"`)
+        .map(({ name, error, url }) => `"${name}","${error}","${url}"`)
         .join('\n'),
     ].join('\n'),
   );
