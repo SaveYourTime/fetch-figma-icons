@@ -1,4 +1,33 @@
-interface Component {
+export enum ComponentStyle {
+  FILLED = 'filled',
+  OUTLINED = 'outlined',
+  TWO_TONED = 'twotoned',
+}
+
+export enum ComponentSize {
+  '20PX' = '20px',
+  '24PX' = '24px',
+}
+
+export enum ComponentMotif {
+  LIGHT = 'light',
+  DARK = 'dark',
+}
+
+export interface MetaComponent {
+  id: string;
+  name: string;
+  setName: string;
+  componentName: string;
+  style: ComponentStyle;
+  size: ComponentSize;
+}
+
+export interface SVGComponent extends MetaComponent {
+  svg: string;
+}
+
+export interface FileComponent {
   key: string;
   name: string;
   description: string;
@@ -6,7 +35,7 @@ interface Component {
   documentationLinks: unknown[];
 }
 
-interface ComponentSet {
+export interface FileComponentSet {
   key: string;
   name: string;
   description: string;
@@ -25,8 +54,8 @@ export interface FileResponse {
       children: unknown[];
     }[];
   };
-  components: { [key: string]: Component };
-  componentSets: { [key: string]: ComponentSet };
+  components: { [key: string]: FileComponent };
+  componentSets: { [key: string]: FileComponentSet };
   schemaVersion: number;
   styles: {
     [key: string]: {
@@ -62,8 +91,8 @@ export interface FileNodeResponse {
         type: string;
         children: unknown[];
       };
-      components: { [key: string]: Component };
-      componentSets: { [key: string]: ComponentSet };
+      components: { [key: string]: FileComponent };
+      componentSets: { [key: string]: FileComponentSet };
       schemaVersion: number;
       styles: {
         [key: string]: {

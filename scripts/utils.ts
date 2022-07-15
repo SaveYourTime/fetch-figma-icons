@@ -5,70 +5,83 @@ import { resolve } from 'path';
 import rimraf from 'rimraf';
 import { loadConfig, optimize } from 'svgo';
 import { getImages, getSVG } from './api';
-import { FileResponse } from './types';
-
-interface Component {
-  id: string;
-  name: string;
-  style: 'Filled' | 'Outlined' | 'TwoToned';
-  size: '20px' | '24px';
-}
-
-interface SVGComponent extends Component {
-  svg: string;
-}
+import {
+  ComponentMotif,
+  ComponentSize,
+  ComponentStyle,
+  FileResponse,
+  MetaComponent,
+  SVGComponent,
+} from './types';
+import {
+  isComponentNameDuplicated,
+  isValidFileComponent,
+  isValidGroupedSvg,
+  isValidMetaComponent,
+  isValidSvgComponent,
+  MetaError,
+  SourceErrorCode,
+} from './validation';
 
 const SVG_PATH = 'src/svg';
 
 export const getComponents = (
-  componentSets: FileResponse['componentSets'],
-  components: FileResponse['components'],
-): Component[] =>
-  Object.entries(components).reduce((result: Component[], [id, component]) => {
-    const { componentSetId } = component;
-    const componentSet = componentSetId && componentSets[componentSetId];
+  { componentSets, components }: FileResponse,
+  errors: MetaError<any>[] = [],
+): MetaComponent[] =>
+  Object.entries(components).reduce(
+    (draft: MetaComponent[], [id, component]) => {
+      if (!isValidFileComponent(component, componentSets, errors)) {
+        return draft;
+      }
 
-    if (componentSet) {
+      const componentSet = componentSets[component.componentSetId!];
       // remove empty spaces and dashes from componentSet name
       const name = componentSet.name.replace(/ |-|\(|\)|\//g, '');
 
       // extract style, size, mode from component name
       const properties = component.name.split(', ');
-      const style = (properties
+      const style = properties
         .find((property) => property.toLowerCase().startsWith('style='))
-        ?.replace(/Style=|-/g, '') ?? '') as Component['style'] | '';
-      const size = (properties
+        ?.replace(/Style=|-/g, '')
+        ?.toLowerCase() as ComponentStyle | undefined;
+      const size = properties
         .find((property) => property.toLowerCase().startsWith('size='))
-        ?.replace(/Size=|-/g, '') ?? '') as Component['size'] | '';
-      const mode = (properties
+        ?.replace(/Size=|-/g, '')
+        ?.toLowerCase() as ComponentSize | undefined;
+      const mode = properties
         .find((property) => property.toLowerCase().startsWith('mode='))
-        ?.replace(/Mode=|-/g, '') ?? '') as 'Light' | 'Dark' | '';
+        ?.replace(/Mode=|-/g, '')
+        ?.toLowerCase() as ComponentMotif | undefined;
+
+      const comp = {
+        id,
+        name,
+        style,
+        size,
+        setName: componentSet.name,
+        componentName: component.name,
+      };
+      if (!isValidMetaComponent(comp, errors)) return draft;
 
       // skip components with outlined style
-      if (style.toLowerCase() === 'outlined') return result;
+      if (style === ComponentStyle.OUTLINED) return draft;
       // skip dark mode for now
-      if (mode.toLowerCase() === 'dark') return result;
-      // skip components with invalid style
-      if (!style || !['filled', 'twotoned'].includes(style.toLowerCase())) {
-        console.log('Invalid style:', name, style);
-        return result;
-      }
-      // skip components with invalid size
-      if (!size || !['20px', '24px'].includes(size.toLowerCase())) {
-        console.log('Invalid size:', name, size);
-        return result;
-      }
+      if (mode === ComponentMotif.DARK) return draft;
 
-      result.push({ id, name, style, size });
-    } else {
-      console.log('ComponentSet not found:', component.name);
-    }
+      draft.push(comp);
 
-    return result;
-  }, []);
+      return draft;
+    },
+    [],
+  );
 
-export const getSVGsFromComponents = async (components: Component[]) => {
-  const CHUNK_SIZE = 50;
+const CHUNK_SIZE = 50;
+
+export const getSVGsFromComponents = async (
+  components: MetaComponent[],
+  errors: MetaError<any>[] = [],
+) => {
   const ids = components.map((component) => component.id);
   const idChunks = chunk(ids, CHUNK_SIZE);
   const imageGroups = await Promise.all(
@@ -77,10 +90,14 @@ export const getSVGsFromComponents = async (components: Component[]) => {
   const images = assign({}, ...imageGroups);
   return Promise.all(
     components
-      .filter(({ id, name }) => {
+      .filter((component) => {
+        const { id } = component;
         const imageUrl = images[id];
         if (!imageUrl) {
-          console.log('Image url not found:', name);
+          errors.push({
+            errorCode: SourceErrorCode.IMAGE_URL_NOT_FOUND,
+            raw: component,
+          });
           return false;
         }
         return true;
@@ -88,28 +105,24 @@ export const getSVGsFromComponents = async (components: Component[]) => {
       .map(async ({ id, name, style, size }) => {
         const imageUrl = images[id];
         const svg = await getSVG(imageUrl);
-        return { id, name, style, size, svg };
+        return { id, name, style, size, svg } as SVGComponent;
       }),
   );
 };
 
-const sanitizeSVGs = (components: SVGComponent[]) =>
+const sanitizeSVGs = (
+  components: SVGComponent[],
+  errors: MetaError<any>[] = [],
+) =>
   components.filter((component, index, items) => {
-    if (!component.svg) {
-      console.log('SVG not fould:', component.name);
+    if (!isValidSvgComponent(component, errors)) {
       return false;
     }
-    if (
-      items.findIndex(
-        (item) =>
-          item.name === component.name &&
-          item.style === component.style &&
-          item.size === component.size,
-      ) !== index
-    ) {
-      console.log('Duplicate found:', component.name);
+
+    if (isComponentNameDuplicated(component, items)) {
       return false;
     }
+
     return true;
   });
 
@@ -129,7 +142,10 @@ const optimizeSVG = async (svg: string, path: string) => {
   return svg;
 };
 
-export const generateSVGs = async (svgs: SVGComponent[]) => {
+export const generateSVGs = async (
+  svgs: SVGComponent[],
+  errors: MetaError<any>[] = [],
+) => {
   // clean svg folder
   await new Promise((res, rej) => {
     rimraf(SVG_PATH, (err) => (err ? rej(err) : res(true)));
@@ -140,8 +156,8 @@ export const generateSVGs = async (svgs: SVGComponent[]) => {
   const groupedSVGs = sanitizedSVGs.reduce(
     (
       result: {
-        [key: Component['name']]: {
-          [key in Component['style']]: string;
+        [key: MetaComponent['name']]: {
+          [key in MetaComponent['style']]: string;
         };
       },
       item,
@@ -153,24 +169,28 @@ export const generateSVGs = async (svgs: SVGComponent[]) => {
     {},
   );
   await Promise.all(
-    Object.entries(groupedSVGs).map(async ([name, { Filled, TwoToned }]) => {
-      if (!Filled || !TwoToned) {
-        console.log('Missing Filled or TwoToned SVG:', name);
+    Object.entries(groupedSVGs).map(async ([name, { filled, twotoned }]) => {
+      if (!isValidGroupedSvg({ name, filled, twotoned }, errors)) {
         return;
       }
-      const FilledSVGDOM = new JSDOM(Filled).window.document.querySelector(
+
+      const FilledSVGDOM = new JSDOM(filled).window.document.querySelector(
         'svg',
       );
       const filledWithoutSVGTag = FilledSVGDOM?.innerHTML ?? '';
-      const TwoTonedSVGDOM = new JSDOM(TwoToned).window.document.querySelector(
+      const TwoTonedSVGDOM = new JSDOM(twotoned).window.document.querySelector(
         'svg',
       );
       TwoTonedSVGDOM?.insertAdjacentHTML('beforeend', filledWithoutSVGTag);
       const combinedSVG = TwoTonedSVGDOM?.outerHTML ?? '';
       if (!combinedSVG) {
-        console.log('Failed to combine SVG:', name);
+        errors.push({
+          errorCode: SourceErrorCode.COMBINE_FAIL,
+          raw: { name },
+        });
         return;
       }
+
       const path = resolve(SVG_PATH, `${name}.svg`);
       const modifiedSVG = modifySVG(combinedSVG);
       const optimizedSVG = await optimizeSVG(modifiedSVG, path);
