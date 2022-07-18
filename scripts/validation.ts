@@ -1,4 +1,4 @@
-import { promises as fs } from 'fs';
+// eslint-disable-next-line max-classes-per-file
 import {
   ComponentSize,
   ComponentStyle,
@@ -28,6 +28,73 @@ export enum SourceErrorCode {
   COMPONENT_SET_NOT_FOUND = 3006,
 }
 
+export class MetaError<R> {
+  static ERROR_MESSAGE: Record<number, string> = {
+    [StyleErrorCode.PROPERTY_NOT_EXISTED]: `Can't found Component Property 'Style'`,
+    [StyleErrorCode.INVALID_VALUE]: `The value of Component Property 'Style' should be 'Filled', 'TwoToned', 'Outlined'`,
+    [SizeErrorCode.PROPERTY_NOT_EXISTED]: `Can't found Component Property 'Size'`,
+    [SizeErrorCode.INVALID_VALUE]: `The value of Component Property 'Size' should be '20px', '24px'`,
+    [SourceErrorCode.IMAGE_URL_NOT_FOUND]: `Can't found source url`,
+    [SourceErrorCode.SVG_NOT_FOUND]: `Can't found svg`,
+    [SourceErrorCode.COMPONENT_SET_NOT_FOUND]: `Can't found icon name from parents' layer`,
+    [SourceErrorCode.COMPONENT_NAME_DUPLICATED]: `There are duplicated naming for several svgs`,
+    [SourceErrorCode.MISSING_FILLED_SVG]: `svg for 'Filled' style is missing`,
+    [SourceErrorCode.MISSING_TWOTONED_SVG]: `svg for 'TowToned' style is missing`,
+  };
+
+  errorCode: number | undefined;
+
+  raw: R;
+
+  constructor(raw: R, errorCode?: number) {
+    this.raw = raw;
+    this.errorCode = errorCode;
+  }
+
+  toString(): string {
+    return this.errorCode
+      ? `[${this.errorCode}] ${MetaError.ERROR_MESSAGE[this.errorCode]}`
+      : '';
+  }
+}
+
+export class MetaErrorCollection {
+  arr: MetaError<any>[] = [];
+
+  add(raw: any, errorCode?: number) {
+    this.arr.push(new MetaError(raw, errorCode));
+  }
+
+  report(format: 'array'): { name?: string; error?: string; url?: string }[];
+  report(format: 'csv'): string;
+  report(format: string): any {
+    const formatted = this.arr
+      .sort((a, b) => (a.raw.name > b.raw.name ? 1 : -1))
+      .map((error) => ({
+        name: error.raw.name,
+        error: error.toString(),
+        url: error.raw.id
+          ? `https://www.figma.com/file/${
+              process.env.FIGMA_FILE_KEY
+            }?node-id=${error.raw.id.toString()}`
+          : '',
+      }));
+
+    switch (format) {
+      case 'csv':
+        return [
+          'name,error,url',
+          formatted
+            .map(({ name, error, url }) => `"${name}","${error}","${url}"`)
+            .join('\n'),
+        ].join('\n');
+      case 'array':
+      default:
+        return formatted;
+    }
+  }
+}
+
 function validateStyle(val: any): StyleErrorCode | undefined {
   if (!val) return StyleErrorCode.PROPERTY_NOT_EXISTED;
   if (
@@ -48,39 +115,24 @@ function validateSize(val: any): SizeErrorCode | undefined {
   return undefined;
 }
 
-export interface MetaError<R> {
-  errorCode: number;
-  raw: R;
-}
-
 export function isValidMetaComponent(
   val: Record<string, any>,
-  errors: MetaError<typeof val>[],
+  errors?: MetaErrorCollection,
 ): val is MetaComponent {
   const { style, size } = val;
   const errorCode = validateStyle(style) || validateSize(size);
-  if (errors && errorCode) {
-    errors.push({
-      errorCode,
-      raw: val,
-    });
-  }
+  if (errorCode) errors?.add(val, errorCode);
 
   return !errorCode;
 }
 
 export function isValidSvgComponent(
   val: Record<string, any>,
-  errors?: MetaError<typeof val>[],
+  errors?: MetaErrorCollection,
 ): val is SVGComponent {
   const { svg } = val;
   const valid = !!svg;
-  if (errors && !valid) {
-    errors.push({
-      errorCode: SourceErrorCode.SVG_NOT_FOUND,
-      raw: val,
-    });
-  }
+  if (!valid) errors?.add(val, SourceErrorCode.SVG_NOT_FOUND);
 
   return valid;
 }
@@ -88,7 +140,7 @@ export function isValidSvgComponent(
 export function isComponentNameDuplicated(
   component: SVGComponent,
   arr: SVGComponent[],
-  errors?: MetaError<any>[],
+  errors?: MetaErrorCollection,
 ): boolean {
   const duplicated = arr.some(
     (item) =>
@@ -98,11 +150,8 @@ export function isComponentNameDuplicated(
       item.size === component.size,
   );
 
-  if (errors && duplicated) {
-    errors.push({
-      errorCode: SourceErrorCode.COMPONENT_NAME_DUPLICATED,
-      raw: component,
-    });
+  if (duplicated) {
+    errors?.add(component, SourceErrorCode.COMPONENT_NAME_DUPLICATED);
   }
 
   return duplicated;
@@ -114,22 +163,16 @@ export function isValidGroupedSvg(
     [ComponentStyle.FILLED]?: string;
     [ComponentStyle.TWO_TONED]?: string;
   },
-  errors: MetaError<any>[],
+  errors?: MetaErrorCollection,
 ): boolean {
   const { name, filled, twotoned } = val;
   if (!filled) {
-    errors.push({
-      errorCode: SourceErrorCode.MISSING_FILLED_SVG,
-      raw: { name },
-    });
+    errors?.add({ name }, SourceErrorCode.MISSING_FILLED_SVG);
     return false;
   }
 
   if (!twotoned) {
-    errors.push({
-      errorCode: SourceErrorCode.MISSING_TWOTONED_SVG,
-      raw: { name },
-    });
+    errors?.add({ name }, SourceErrorCode.MISSING_TWOTONED_SVG);
     return false;
   }
 
@@ -139,56 +182,14 @@ export function isValidGroupedSvg(
 export function isValidFileComponent(
   component: FileComponent,
   componentSet: Record<string, FileComponentSet>,
-  errors?: MetaError<any>[],
+  errors?: MetaErrorCollection,
 ): boolean {
   const valid = !!(
     component.componentSetId && componentSet[component.componentSetId]
   );
-  if (errors && !valid) {
-    errors.push({
-      errorCode: SourceErrorCode.COMPONENT_SET_NOT_FOUND,
-      raw: component,
-    });
+  if (!valid) {
+    errors?.add(component, SourceErrorCode.COMPONENT_SET_NOT_FOUND);
   }
 
   return valid;
-}
-
-const ERROR_MESSAGE: Record<number, string> = {
-  [StyleErrorCode.PROPERTY_NOT_EXISTED]: `Can't found Component Property 'Style'`,
-  [StyleErrorCode.INVALID_VALUE]: `The value of Component Property 'Style' should be 'Filled', 'TwoToned', 'Outlined'`,
-  [SizeErrorCode.PROPERTY_NOT_EXISTED]: `Can't found Component Property 'Size'`,
-  [SizeErrorCode.INVALID_VALUE]: `The value of Component Property 'Size' should be '20px', '24px'`,
-  [SourceErrorCode.IMAGE_URL_NOT_FOUND]: `Can't found source url`,
-  [SourceErrorCode.SVG_NOT_FOUND]: `Can't found svg`,
-  [SourceErrorCode.COMPONENT_SET_NOT_FOUND]: `Can't found icon name from parents' layer`,
-  [SourceErrorCode.COMPONENT_NAME_DUPLICATED]: `There are duplicated naming for several svgs`,
-  [SourceErrorCode.MISSING_FILLED_SVG]: `svg for 'Filled' style is missing`,
-  [SourceErrorCode.MISSING_TWOTONED_SVG]: `svg for 'TowToned' style is missing`,
-};
-
-export function translateErrorCode(errorCode: number): string {
-  return ERROR_MESSAGE[errorCode] || '';
-}
-
-export async function exportErrors(errors: MetaError<any>[]) {
-  const formatted = errors
-    .sort((a, b) => (a.raw.name > b.raw.name ? 1 : -1))
-    .map(({ errorCode, raw: { id, name } }) => ({
-      name,
-      error: translateErrorCode(errorCode),
-      url: id
-        ? `https://www.figma.com/file/${process.env.FIGMA_FILE_KEY}?node-id=${id}`
-        : '',
-    }));
-  console.table(formatted);
-  await fs.writeFile(
-    './error.csv',
-    [
-      'name,error,url',
-      formatted
-        .map(({ name, error, url }) => `"${name}","${error}","${url}"`)
-        .join('\n'),
-    ].join('\n'),
-  );
 }

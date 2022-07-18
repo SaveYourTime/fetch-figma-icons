@@ -19,7 +19,7 @@ import {
   isValidGroupedSvg,
   isValidMetaComponent,
   isValidSvgComponent,
-  MetaError,
+  MetaErrorCollection,
   SourceErrorCode,
 } from './validation';
 
@@ -27,7 +27,7 @@ const SVG_PATH = 'src/svg';
 
 export const getComponents = (
   { componentSets, components }: FileResponse,
-  errors: MetaError<any>[] = [],
+  errors?: MetaErrorCollection,
 ): MetaComponent[] =>
   Object.entries(components).reduce(
     (draft: MetaComponent[], [id, component]) => {
@@ -80,7 +80,7 @@ const CHUNK_SIZE = 50;
 
 export const getSVGsFromComponents = async (
   components: MetaComponent[],
-  errors: MetaError<any>[] = [],
+  errors?: MetaErrorCollection,
 ) => {
   const ids = components.map((component) => component.id);
   const idChunks = chunk(ids, CHUNK_SIZE);
@@ -94,10 +94,7 @@ export const getSVGsFromComponents = async (
         const { id } = component;
         const imageUrl = images[id];
         if (!imageUrl) {
-          errors.push({
-            errorCode: SourceErrorCode.IMAGE_URL_NOT_FOUND,
-            raw: component,
-          });
+          errors?.add(component, SourceErrorCode.IMAGE_URL_NOT_FOUND);
           return false;
         }
         return true;
@@ -112,7 +109,7 @@ export const getSVGsFromComponents = async (
 
 const sanitizeSVGs = (
   components: SVGComponent[],
-  errors: MetaError<any>[] = [],
+  errors?: MetaErrorCollection,
 ) =>
   components.filter((component, index, items) => {
     if (!isValidSvgComponent(component, errors)) {
@@ -144,7 +141,7 @@ const optimizeSVG = async (svg: string, path: string) => {
 
 export const generateSVGs = async (
   svgs: SVGComponent[],
-  errors: MetaError<any>[] = [],
+  errors?: MetaErrorCollection,
 ) => {
   // clean svg folder
   await new Promise((res, rej) => {
@@ -184,10 +181,7 @@ export const generateSVGs = async (
       TwoTonedSVGDOM?.insertAdjacentHTML('beforeend', filledWithoutSVGTag);
       const combinedSVG = TwoTonedSVGDOM?.outerHTML ?? '';
       if (!combinedSVG) {
-        errors.push({
-          errorCode: SourceErrorCode.COMBINE_FAIL,
-          raw: { name },
-        });
+        errors?.add({ name }, SourceErrorCode.COMBINE_FAIL);
         return;
       }
 
